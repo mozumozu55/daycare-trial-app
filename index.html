@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="体験→本利用">
+<title>通所介護 体験利用 分析アプリ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text2: #5a5a55;
+    --text3: #9a9990;
+    --accent: #185FA5;
+    --accent-bg: #E6F1FB;
+    --green: #1D9E75;
+    --green-bg: #E1F5EE;
+    --amber: #BA7517;
+    --amber-bg: #FAEEDA;
+    --red: #A32D2D;
+    --red-bg: #FCEBEB;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #242422;
+      --surface2: #2e2e2a;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.18);
+      --text: #f0efe9;
+      --text2: #a0a098;
+      --text3: #606058;
+      --accent: #378ADD;
+      --accent-bg: #0C2840;
+      --green: #5DCAA5;
+      --green-bg: #062820;
+      --amber: #FAC775;
+      --amber-bg: #2a1e08;
+      --red: #F09595;
+      --red-bg: #2a0c0c;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: -apple-system, 'Helvetica Neue', sans-serif; color: var(--text); }
+
+  /* ===== HEADER ===== */
+  .app-header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 14px 20px 0;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .app-title { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+  .app-subtitle { font-size: 12px; color: var(--text2); font-weight: 400; margin-left: 6px; }
+  .tabs { display: flex; gap: 0; }
+  .tab {
+    flex: 1; padding: 10px 4px; font-size: 13px; font-weight: 500;
+    border: none; background: none; color: var(--text2);
+    border-bottom: 2.5px solid transparent; cursor: pointer;
+    transition: color 0.2s; text-align: center;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ===== MAIN SCROLL ===== */
+  .main { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+  /* ===== PANEL ===== */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* ===== FORM ===== */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.02em; }
+  .form-group input, .form-group select {
+    font-size: 15px; padding: 10px 12px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--surface2);
+    color: var(--text);
+    width: 100%;
+    -webkit-appearance: none; appearance: none;
+  }
+  .form-group select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+
+  /* ===== BUTTONS ===== */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .btn {
+    padding: 12px 20px; border-radius: var(--radius); font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 0.5px solid var(--border2); }
+  .btn-sample { background: var(--amber-bg); color: var(--amber); border: 0.5px solid var(--amber); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; font-weight: 500; border: 0.5px solid var(--red); background: var(--red-bg); color: var(--red); cursor: pointer; }
+  .btn-csv-export { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green); }
+  .btn-csv-import { background: var(--accent-bg); color: var(--accent); border: 0.5px solid var(--accent); }
+  #csv-import-input { display: none; }
+  .csv-note { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.6; }
+
+  /* ===== MESSAGES ===== */
+  .msg { margin-top: 10px; font-size: 13px; color: var(--green); font-weight: 500; min-height: 20px; }
+
+  /* ===== METRICS ===== */
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .metric {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 12px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .metric-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; font-weight: 500; }
+  .metric-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .metric-value.blue { color: var(--accent); }
+  .metric-value.green { color: var(--green); }
+  .metric-value.amber { color: var(--amber); }
+  .metric-value.coral { color: #D85A30; }
+
+  /* ===== INSIGHTS ===== */
+  .insight {
+    background: var(--accent-bg);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  strong { font-weight: 700; color: var(--accent); }
+
+  /* ===== CHART ===== */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    box-shadow: var(--shadow);
+  }
+  .chart-label { font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ===== TABLE ===== */
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .filter-bar select { font-size: 13px; padding: 8px 32px 8px 10px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--surface2); color: var(--text); -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  .list-count { font-size: 12px; color: var(--text2); }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+  th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface); }
+  td { padding: 10px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* ===== BADGES ===== */
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-yes { background: var(--green-bg); color: var(--green); }
+  .badge-no { background: var(--surface2); color: var(--text2); }
+  .badge-good { background: var(--green-bg); color: var(--green); }
+  .badge-normal { background: var(--accent-bg); color: var(--accent); }
+  .badge-worry { background: var(--red-bg); color: var(--red); }
+  .stars { color: #BA7517; font-size: 12px; }
+
+  /* ===== EMPTY ===== */
+  .empty { text-align: center; padding: 3rem 1rem; color: var(--text2); font-size: 14px; line-height: 2; }
+
+  /* ===== SECTION HEADER ===== */
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .section-title { font-size: 16px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-title">通所介護 体験利用 分析<span class="app-subtitle">体験 → 本利用 コンバージョン管理</span></div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('input')">📝 データ入力</button>
+    <button class="tab" onclick="switchTab('list')">📋 一覧</button>
+    <button class="tab" onclick="switchTab('analysis')">📊 分析</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ===== 入力 ===== -->
+  <div id="panel-input" class="panel active">
+    <div class="card">
+      <div class="card-title">基本情報</div>
+      <div class="form-grid">
+        <div class="form-group"><label>年齢</label><input type="number" id="f-age" min="18" max="120" placeholder="例: 75" inputmode="numeric"></div>
+        <div class="form-group"><label>性別</label><select id="f-gender"><option value="">選択してください</option><option>男性</option><option>女性</option></select></div>
+        <div class="form-group"><label>要介護度</label><select id="f-care"><option value="">選択してください</option><option>要支援1</option><option>要支援2</option><option>要介護1</option><option>要介護2</option><option>要介護3</option><option>要介護4</option><option>要介護5</option></select></div>
+        <div class="form-group"><label>主疾患</label><select id="f-disease"><option value="">選択してください</option><option>脳血管疾患</option><option>認知症</option><option>骨・関節疾患</option><option>心疾患</option><option>糖尿病</option><option>その他</option></select></div>
+        <div class="form-group"><label>体験日</label><input type="date" id="f-date"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">体験内容</div>
+      <div class="form-grid">
+        <div class="form-group"><label>プログラム内容</label><select id="f-program"><option value="">選択してください</option><option>機能訓練中心</option><option>レクリエーション中心</option><option>入浴中心</option><option>認知症ケア</option><option>複合プログラム</option></select></div>
+        <div class="form-group"><label>歩行分析</label><select id="f-gait"><option value="">選択してください</option><option>あり</option><option>なし</option></select></div>
+        <div class="form-group"><label>滞在時間（時間）</label><input type="number" id="f-stay" min="1" max="12" step="0.5" placeholder="例: 4" inputmode="decimal"></div>
+        <div class="form-group"><label>本人満足度（1〜5）</label><select id="f-satisfaction"><option value="">選択してください</option><option value="1">1 — とても不満</option><option value="2">2 — 不満</option><option value="3">3 — 普通</option><option value="4">4 — 満足</option><option value="5">5 — とても満足</option></select></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">家族・送迎</div>
+      <div class="form-grid">
+        <div class="form-group"><label>家族同席</label><select id="f-family"><option value="">選択してください</option><option>あり</option><option>なし</option></select></div>
+        <div class="form-group"><label>家族反応</label><select id="f-freaction"><option value="">選択してください</option><option>良</option><option>普</option><option>不安</option></select></div>
+        <div class="form-group"><label>送迎問題</label><select id="f-transport"><option value="">選択してください</option><option>あり</option><option>なし</option></select></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">フォロー・本利用結果</div>
+      <div class="form-grid">
+        <div class="form-group"><label>フォロー有無</label><select id="f-follow"><option value="">選択してください</option><option>あり</option><option>なし</option></select></div>
+        <div class="form-group"><label>フォロー日数</label><input type="number" id="f-followdays" min="0" max="90" placeholder="例: 7" inputmode="numeric"></div>
+        <div class="form-group"><label>本利用</label><select id="f-convert"><option value="">選択してください</option><option>Yes</option><option>No</option></select></div>
+        <div class="form-group"><label>利用開始日数</label><input type="number" id="f-startdays" min="0" max="365" placeholder="例: 14" inputmode="numeric"></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveRecord()">登録する</button>
+      <button class="btn btn-secondary" onclick="clearForm()">クリア</button>
+      <button class="btn btn-sample" onclick="loadSample()">サンプルデータ読込</button>
+    </div>
+    <div id="form-msg" class="msg"></div>
+  </div>
+
+  <!-- ===== 一覧 ===== -->
+  <div id="panel-list" class="panel">
+    <div class="section-header">
+      <div class="section-title">登録一覧 <span id="list-count" class="list-count"></span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-csv-export" onclick="exportCSV()">⬇ CSVダウンロード</button>
+        <button class="btn btn-csv-import" onclick="document.getElementById('csv-import-input').click()">⬆ CSV読み込み</button>
+        <input type="file" id="csv-import-input" accept=".csv" onchange="importCSV(event)">
+      </div>
+    </div>
+    <div class="filter-bar">
+      <select id="flt-convert" onchange="renderList()"><option value="">本利用：全て</option><option value="Yes">Yes</option><option value="No">No</option></select>
+      <select id="flt-care" onchange="renderList()"><option value="">要介護度：全て</option><option>要支援1</option><option>要支援2</option><option>要介護1</option><option>要介護2</option><option>要介護3</option><option>要介護4</option><option>要介護5</option></select>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrap">
+        <div id="list-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 分析 ===== -->
+  <div id="panel-analysis" class="panel">
+    <div class="section-title" style="margin-bottom:12px">分析ダッシュボード</div>
+    <div class="metrics-grid" id="metrics-area"></div>
+    <div id="insights-area" style="margin-bottom:14px"></div>
+    <div class="charts-grid" id="charts-grid"></div>
+  </div>
+
+</div>
+
+<script>
+const STORE_KEY = 'daycare_v2';
+let records = [];
+
+function loadData() {
+  try { const s = localStorage.getItem(STORE_KEY); if (s) records = JSON.parse(s); } catch(e) {}
+}
+function saveData() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(records)); } catch(e) {}
+}
+
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[onclick="switchTab('${t}')"]`).classList.add('active');
+  document.getElementById('panel-' + t).classList.add('active');
+  if (t === 'list') renderList();
+  if (t === 'analysis') renderAnalysis();
+}
+
+function getFields() {
+  return {
+    id: Date.now(),
+    age: parseInt(document.getElementById('f-age').value) || null,
+    gender: document.getElementById('f-gender').value,
+    care: document.getElementById('f-care').value,
+    disease: document.getElementById('f-disease').value,
+    date: document.getElementById('f-date').value,
+    program: document.getElementById('f-program').value,
+    gait: document.getElementById('f-gait').value,
+    stay: parseFloat(document.getElementById('f-stay').value) || null,
+    satisfaction: parseInt(document.getElementById('f-satisfaction').value) || null,
+    family: document.getElementById('f-family').value,
+    freaction: document.getElementById('f-freaction').value,
+    transport: document.getElementById('f-transport').value,
+    follow: document.getElementById('f-follow').value,
+    followdays: parseInt(document.getElementById('f-followdays').value) || 0,
+    convert: document.getElementById('f-convert').value,
+    startdays: parseInt(document.getElementById('f-startdays').value) || 0,
+  };
+}
+
+function saveRecord() {
+  const d = getFields();
+  const req = ['age','gender','care','disease','date','program','gait','stay','satisfaction','family','freaction','transport','follow','convert'];
+  if (req.some(k => !d[k])) {
+    document.getElementById('form-msg').style.color = 'var(--red)';
+    document.getElementById('form-msg').textContent = '⚠ 必須項目を全て入力してください';
+    return;
+  }
+  records.push(d);
+  saveData();
+  document.getElementById('form-msg').style.color = 'var(--green)';
+  document.getElementById('form-msg').textContent = '✓ 登録しました（累計 ' + records.length + ' 件）';
+  clearForm();
+}
+
+function clearForm() {
+  ['f-age','f-gender','f-care','f-disease','f-program','f-gait','f-stay','f-satisfaction','f-family','f-freaction','f-transport','f-follow','f-followdays','f-convert','f-startdays'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+}
+
+function loadSample() {
+  const diseases = ['脳血管疾患','認知症','骨・関節疾患','心疾患','糖尿病','その他'];
+  const programs = ['機能訓練中心','レクリエーション中心','入浴中心','認知症ケア','複合プログラム'];
+  const cares = ['要支援1','要支援2','要介護1','要介護2','要介護3','要介護4','要介護5'];
+  const reactions = ['良','普','不安'];
+  for (let i = 0; i < 30; i++) {
+    const sat = Math.floor(Math.random() * 5) + 1;
+    const freact = reactions[Math.floor(Math.random() * 3)];
+    const hasTransport = Math.random() > 0.6;
+    const hasFollow = Math.random() > 0.3;
+    const followdays = hasFollow ? Math.floor(Math.random() * 20) + 3 : 0;
+    const p = sat >= 4 && freact === '良' && !hasTransport && hasFollow ? 0.85 : sat >= 3 && freact !== '不安' && hasFollow ? 0.6 : 0.25;
+    const convert = Math.random() < p ? 'Yes' : 'No';
+    const d = new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
+    records.push({
+      id: Date.now() + i,
+      age: 65 + Math.floor(Math.random() * 25),
+      gender: Math.random() > 0.4 ? '女性' : '男性',
+      care: cares[Math.floor(Math.random() * 5)],
+      disease: diseases[Math.floor(Math.random() * 6)],
+      date: d.toISOString().split('T')[0],
+      program: programs[Math.floor(Math.random() * 5)],
+      gait: Math.random() > 0.5 ? 'あり' : 'なし',
+      stay: Math.round((2 + Math.random() * 5) * 2) / 2,
+      satisfaction: sat,
+      family: Math.random() > 0.4 ? 'あり' : 'なし',
+      freaction: freact,
+      transport: hasTransport ? 'あり' : 'なし',
+      follow: hasFollow ? 'あり' : 'なし',
+      followdays,
+      convert,
+      startdays: convert === 'Yes' ? Math.floor(Math.random() * 30) + 5 : 0
+    });
+  }
+  saveData();
+  document.getElementById('form-msg').style.color = 'var(--green)';
+  document.getElementById('form-msg').textContent = '✓ サンプル30件を読み込みました（累計 ' + records.length + ' 件）';
+}
+
+function renderList() {
+  const fConvert = document.getElementById('flt-convert').value;
+  const fCare = document.getElementById('flt-care').value;
+  const filtered = records.filter(r => (!fConvert || r.convert === fConvert) && (!fCare || r.care === fCare)).slice().reverse();
+  document.getElementById('list-count').textContent = '（' + filtered.length + ' 件）';
+  if (!filtered.length) {
+    document.getElementById('list-table').innerHTML = '<div class="empty">データがありません<br>まずデータ入力タブから登録してください</div>';
+    return;
+  }
+  const stars = s => '★'.repeat(s) + '☆'.repeat(5 - s);
+  const rows = filtered.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${r.age}歳 ${r.gender}</td>
+      <td>${r.care}</td>
+      <td>${r.disease}</td>
+      <td>${r.program}</td>
+      <td><span class="stars">${stars(r.satisfaction || 0)}</span></td>
+      <td><span class="badge ${r.convert === 'Yes' ? 'badge-yes' : 'badge-no'}">${r.convert}</span></td>
+      <td><span class="badge ${r.freaction === '良' ? 'badge-good' : r.freaction === '普' ? 'badge-normal' : 'badge-worry'}">${r.freaction}</span></td>
+      <td>${r.startdays ? r.startdays + '日' : '—'}</td>
+      <td><button class="btn-sm" onclick="deleteRecord(${r.id})">削除</button></td>
+    </tr>`).join('');
+  document.getElementById('list-table').innerHTML = `
+    <table>
+      <thead><tr><th>体験日</th><th>属性</th><th>要介護度</th><th>主疾患</th><th>プログラム</th><th>満足度</th><th>本利用</th><th>家族反応</th><th>開始日数</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function deleteRecord(id) {
+  if (!confirm('このレコードを削除しますか？')) return;
+  records = records.filter(r => r.id !== id);
+  saveData();
+  renderList();
+}
+
+let chartInstances = {};
+function destroyCharts() {
+  Object.values(chartInstances).forEach(c => { try { c.destroy(); } catch(e) {} });
+  chartInstances = {};
+}
+
+function convRate(arr) {
+  if (!arr.length) return 0;
+  return Math.round(arr.filter(r => r.convert === 'Yes').length / arr.length * 100);
+}
+
+function renderAnalysis() {
+  destroyCharts();
+  if (!records.length) {
+    document.getElementById('metrics-area').innerHTML = '<div class="empty">データを登録してください</div>';
+    document.getElementById('insights-area').innerHTML = '';
+    document.getElementById('charts-grid').innerHTML = '';
+    return;
+  }
+
+  const total = records.length;
+  const converted = records.filter(r => r.convert === 'Yes');
+  const rate = Math.round(converted.length / total * 100);
+  const avgSat = (records.reduce((s, r) => s + (r.satisfaction || 0), 0) / total).toFixed(1);
+  const avgStart = converted.length ? Math.round(converted.reduce((s, r) => s + r.startdays, 0) / converted.length) : 0;
+  const avgFollow = records.filter(r => r.follow === 'あり').length ? Math.round(records.filter(r => r.follow === 'あり').reduce((s, r) => s + r.followdays, 0) / records.filter(r => r.follow === 'あり').length) : 0;
+
+  document.getElementById('metrics-area').innerHTML = `
+    <div class="metric"><div class="metric-label">総体験数</div><div class="metric-value blue">${total}</div></div>
+    <div class="metric"><div class="metric-label">本利用数</div><div class="metric-value green">${converted.length}</div></div>
+    <div class="metric"><div class="metric-label">本利用率</div><div class="metric-value ${rate >= 60 ? 'green' : rate >= 40 ? 'amber' : 'coral'}">${rate}%</div></div>
+    <div class="metric"><div class="metric-label">平均満足度</div><div class="metric-value amber">${avgSat}</div></div>
+    <div class="metric"><div class="metric-label">平均開始日数</div><div class="metric-value blue">${avgStart}日</div></div>
+    <div class="metric"><div class="metric-label">平均フォロー日数</div><div class="metric-value blue">${avgFollow}日</div></div>
+  `;
+
+  const insights = [];
+  const highSat = records.filter(r => r.satisfaction >= 4);
+  if (highSat.length) insights.push(`満足度4以上の体験者の本利用率は <strong>${convRate(highSat)}%</strong>（全体比 +${convRate(highSat) - rate}ポイント）`);
+  const fw = records.filter(r => r.follow === 'あり');
+  const nfw = records.filter(r => r.follow === 'なし');
+  if (fw.length && nfw.length) insights.push(`フォローあり: <strong>${convRate(fw)}%</strong> vs フォローなし: <strong>${convRate(nfw)}%</strong> — フォローの効果を確認できます`);
+  const noTrans = records.filter(r => r.transport === 'なし');
+  const yesTrans = records.filter(r => r.transport === 'あり');
+  if (noTrans.length && yesTrans.length) insights.push(`送迎問題なし: <strong>${convRate(noTrans)}%</strong> vs 問題あり: <strong>${convRate(yesTrans)}%</strong>`);
+  const goodFam = records.filter(r => r.freaction === '良');
+  if (goodFam.length) insights.push(`家族反応「良」の本利用率 <strong>${convRate(goodFam)}%</strong> / 「普」${convRate(records.filter(r => r.freaction === '普'))}% / 「不安」${convRate(records.filter(r => r.freaction === '不安'))}%`);
+
+  document.getElementById('insights-area').innerHTML = insights.map(t => `<div class="insight">${t}</div>`).join('');
+
+  document.getElementById('charts-grid').innerHTML = `
+    <div class="chart-card"><div class="chart-label">満足度別 本利用率</div><div class="chart-wrap"><canvas id="c-sat"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">フォロー・家族反応別 本利用率</div><div class="chart-wrap"><canvas id="c-follow"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">プログラム別 本利用率</div><div class="chart-wrap"><canvas id="c-prog"></canvas></div></div>
+    <div class="chart-card"><div class="chart-label">主疾患別 体験者数と本利用率</div><div class="chart-wrap"><canvas id="c-disease"></canvas></div></div>
+  `;
+
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const tickColor = isDark ? '#a0a098' : '#888';
+  const baseOpts = (yMax=100, pct=true) => ({
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } },
+      y: { max: yMax, ticks: { color: tickColor, font: { size: 10 }, callback: v => pct ? v + '%' : v }, grid: { color: gridColor } }
+    }
+  });
+
+  chartInstances.sat = new Chart(document.getElementById('c-sat'), {
+    type: 'bar',
+    data: {
+      labels: ['★1','★2','★3','★4','★5'],
+      datasets: [{ data: [1,2,3,4,5].map(s => convRate(records.filter(r => r.satisfaction === s))),
+        backgroundColor: ['#F09595','#FAC775','#85B7EB','#5DCAA5','#1D9E75'], borderRadius: 5 }]
+    },
+    options: baseOpts()
+  });
+
+  chartInstances.follow = new Chart(document.getElementById('c-follow'), {
+    type: 'bar',
+    data: {
+      labels: ['フォローあり','フォローなし','家族:良','家族:普','家族:不安'],
+      datasets: [{ data: [
+        convRate(records.filter(r => r.follow === 'あり')),
+        convRate(records.filter(r => r.follow === 'なし')),
+        convRate(records.filter(r => r.freaction === '良')),
+        convRate(records.filter(r => r.freaction === '普')),
+        convRate(records.filter(r => r.freaction === '不安')),
+      ], backgroundColor: ['#1D9E75','#B4B2A9','#85B7EB','#FAC775','#F09595'], borderRadius: 5 }]
+    },
+    options: { ...baseOpts(), scales: { x: { ticks: { color: tickColor, font: { size: 9 } }, grid: { color: gridColor } }, y: { max: 100, ticks: { color: tickColor, font: { size: 10 }, callback: v => v + '%' }, grid: { color: gridColor } } } }
+  });
+
+  const progs = ['機能訓練中心','レクリエーション中心','入浴中心','認知症ケア','複合プログラム'];
+  chartInstances.prog = new Chart(document.getElementById('c-prog'), {
+    type: 'bar',
+    data: {
+      labels: progs,
+      datasets: [{ data: progs.map(p => convRate(records.filter(r => r.program === p))),
+        backgroundColor: '#378ADD', borderRadius: 5 }]
+    },
+    options: { ...baseOpts(), indexAxis: 'y',
+      scales: { y: { ticks: { color: tickColor, font: { size: 9 } }, grid: { color: gridColor } }, x: { max: 100, ticks: { color: tickColor, font: { size: 10 }, callback: v => v + '%' }, grid: { color: gridColor } } } }
+  });
+
+  const diss = ['脳血管疾患','認知症','骨・関節疾患','心疾患','糖尿病','その他'];
+  chartInstances.disease = new Chart(document.getElementById('c-disease'), {
+    type: 'bar',
+    data: {
+      labels: diss,
+      datasets: [
+        { label: '体験者数', data: diss.map(d => records.filter(r => r.disease === d).length), backgroundColor: '#AFA9EC', borderRadius: 4, yAxisID: 'y' },
+        { label: '本利用率', data: diss.map(d => convRate(records.filter(r => r.disease === d))), type: 'line', borderColor: '#1D9E75', backgroundColor: '#1D9E7520', tension: 0.4, pointRadius: 4, pointBackgroundColor: '#1D9E75', yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: tickColor, font: { size: 9 } }, grid: { color: gridColor } },
+        y: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor }, title: { display: true, text: '人数', color: tickColor, font: { size: 10 } } },
+        y2: { position: 'right', max: 100, ticks: { color: '#1D9E75', font: { size: 10 }, callback: v => v + '%' }, grid: { drawOnChartArea: false }, title: { display: true, text: '本利用率', color: '#1D9E75', font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ===== CSV =====
+const CSV_HEADERS = ['id','age','gender','care','disease','date','program','gait','stay','satisfaction','family','freaction','transport','follow','followdays','convert','startdays'];
+const CSV_LABELS  = ['ID','年齢','性別','要介護度','主疾患','体験日','プログラム内容','歩行分析','滞在時間','本人満足度','家族同席','家族反応','送迎問題','フォロー有無','フォロー日数','本利用','利用開始日数'];
+
+function escapeCSV(v) {
+  const s = v === null || v === undefined ? '' : String(v);
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportCSV() {
+  if (!records.length) { alert('エクスポートするデータがありません'); return; }
+  const rows = [CSV_LABELS.join(',')];
+  records.forEach(r => rows.push(CSV_HEADERS.map(k => escapeCSV(r[k])).join(',')));
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '通所介護体験データ_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result.replace(/^\uFEFF/, '');
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { alert('データ行がありません'); return; }
+      const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+      const isLabelFormat = header[0] === 'ID' || header[0] === '年齢';
+      const keys = isLabelFormat
+        ? header.map(h => { const i = CSV_LABELS.indexOf(h); return i >= 0 ? CSV_HEADERS[i] : h.toLowerCase(); })
+        : header;
+      let added = 0, skipped = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseCSVLine(lines[i]);
+        if (vals.length < 2) continue;
+        const obj = {};
+        keys.forEach((k, idx) => { obj[k] = vals[idx] !== undefined ? vals[idx] : ''; });
+        const rec = {
+          id: parseInt(obj.id) || Date.now() + i,
+          age: parseInt(obj.age) || null,
+          gender: obj.gender || '',
+          care: obj.care || '',
+          disease: obj.disease || '',
+          date: obj.date || '',
+          program: obj.program || '',
+          gait: obj.gait || '',
+          stay: parseFloat(obj.stay) || null,
+          satisfaction: parseInt(obj.satisfaction) || null,
+          family: obj.family || '',
+          freaction: obj.freaction || '',
+          transport: obj.transport || '',
+          follow: obj.follow || '',
+          followdays: parseInt(obj.followdays) || 0,
+          convert: obj.convert || '',
+          startdays: parseInt(obj.startdays) || 0,
+        };
+        if (records.find(r => r.id === rec.id)) { skipped++; continue; }
+        records.push(rec);
+        added++;
+      }
+      saveData();
+      renderList();
+      alert(`CSV読み込み完了：${added}件追加、${skipped}件スキップ（重複ID）`);
+    } catch(err) {
+      alert('CSV読み込みエラー：' + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else { inQ = !inQ; } }
+    else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+loadData();
+document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+</script>
+</body>
+</html>
