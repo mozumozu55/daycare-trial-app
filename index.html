@@ -247,6 +247,8 @@
         <div class="form-group"><label>歩行分析</label><select id="f-gait"><option value="">選択してください</option><option>あり</option><option>なし</option></select></div>
         <div class="form-group"><label>滞在時間（時間）</label><input type="number" id="f-stay" min="1" max="12" step="0.5" placeholder="例: 4" inputmode="decimal"></div>
         <div class="form-group"><label>本人満足度（1〜5）</label><select id="f-satisfaction"><option value="">選択してください</option><option value="1">1 — とても不満</option><option value="2">2 — 不満</option><option value="3">3 — 普通</option><option value="4">4 — 満足</option><option value="5">5 — とても満足</option></select></div>
+        <div class="form-group"><label>ケアマネ事業所名</label><input type="text" id="f-cm-office" placeholder="事業所名を入力"></div>
+        <div class="form-group"><label>ケアマネ氏名</label><input type="text" id="f-cm-name" placeholder="氏名を入力"></div>
       </div>
     </div>
 
@@ -347,6 +349,8 @@ function getFields() {
     disease: document.getElementById('f-disease').value,
     date: document.getElementById('f-date').value,
     referral: document.getElementById('f-referral').value,
+    cmOffice: document.getElementById('f-cm-office').value.trim(),
+    cmName: document.getElementById('f-cm-name').value.trim(),
     therapist: document.getElementById('f-therapist').value.trim(),
     purpose: Array.from(document.querySelectorAll('#purpose-group .check-item.checked')).map(el => el.textContent.trim()),
     gait: document.getElementById('f-gait').value,
@@ -378,7 +382,7 @@ function saveRecord() {
 }
 
 function clearForm() {
-  ['f-age','f-gender','f-care','f-disease','f-referral','f-therapist','f-gait','f-stay','f-satisfaction','f-family','f-freaction','f-transport','f-follow','f-followdays','f-convert','f-startdays'].forEach(id => {
+  ['f-age','f-gender','f-care','f-disease','f-referral','f-therapist','f-cm-office','f-cm-name','f-gait','f-stay','f-satisfaction','f-family','f-freaction','f-transport','f-follow','f-followdays','f-convert','f-startdays'].forEach(id => {
     const el = document.getElementById(id);
     if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
   });
