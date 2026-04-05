@@ -217,6 +217,7 @@
 
 <div class="app-header">
   <div class="app-title">通所介護 体験利用 分析<span class="app-subtitle">体験 → 本利用 コンバージョン管理</span></div>
+  <div id="save-status" style="font-size:11px;color:var(--green);margin-bottom:6px;min-height:16px;font-weight:500;"></div>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('input')">📝 データ入力</button>
     <button class="tab" onclick="switchTab('list')">📋 一覧</button>
@@ -322,14 +323,58 @@
 
 <script>
 const STORE_KEY = 'daycare_v2';
+const BACKUP_KEY = 'daycare_v2_backup';
 let records = [];
+let saveTimer = null;
 
 function loadData() {
-  try { const s = localStorage.getItem(STORE_KEY); if (s) records = JSON.parse(s); } catch(e) {}
+  try {
+    const s = localStorage.getItem(STORE_KEY);
+    if (s) { records = JSON.parse(s); return; }
+  } catch(e) {}
+  // メインが読めない場合はバックアップから復元
+  try {
+    const b = localStorage.getItem(BACKUP_KEY);
+    if (b) { records = JSON.parse(b); saveData(); }
+  } catch(e) {}
 }
+
 function saveData() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(records)); } catch(e) {}
+  try {
+    const json = JSON.stringify(records);
+    localStorage.setItem(STORE_KEY, json);
+    localStorage.setItem(BACKUP_KEY, json); // 二重保存
+    localStorage.setItem(STORE_KEY + '_savedAt', new Date().toISOString());
+    showSaveStatus('✓ 自動保存済み　' + new Date().toLocaleTimeString('ja-JP'), false);
+  } catch(e) {
+    showSaveStatus('⚠ 保存失敗 — CSVダウンロードを推奨', true);
+  }
 }
+
+function showSaveStatus(msg, isError) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--red)' : 'var(--green)';
+}
+
+// ページを閉じる前に未保存チェック
+window.addEventListener('beforeunload', (e) => {
+  // 最終保存時刻を確認
+  const savedAt = localStorage.getItem(STORE_KEY + '_savedAt');
+  if (!savedAt) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// アプリを隠す（ホームボタン等）ときにも保存
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveData();
+});
+
+// ページフォーカスが外れたときも保存
+window.addEventListener('pagehide', () => saveData());
 
 function switchTab(t) {
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
@@ -625,8 +670,8 @@ function renderAnalysis() {
 }
 
 // ===== CSV =====
-const CSV_HEADERS = ['id','age','gender','care','disease','date','referral','therapist','purpose','gait','stay','satisfaction','family','freaction','transport','follow','followdays','convert','startdays'];
-const CSV_LABELS  = ['ID','年齢','性別','要介護度','主疾患','体験日','紹介先','セラピスト名','利用目的','歩行分析','滞在時間','本人満足度','家族同席','家族反応','送迎問題','フォロー有無','フォロー日数','本利用','利用開始日数'];
+const CSV_HEADERS = ['id','age','gender','care','disease','date','referral','cmOffice','cmName','therapist','purpose','gait','stay','satisfaction','family','freaction','transport','follow','followdays','convert','startdays'];
+const CSV_LABELS  = ['ID','年齢','性別','要介護度','主疾患','体験日','紹介先','ケアマネ事業所名','ケアマネ氏名','セラピスト名','利用目的','歩行分析','滞在時間','本人満足度','家族同席','家族反応','送迎問題','フォロー有無','フォロー日数','本利用','利用開始日数'];
 
 function escapeCSV(v) {
   const s = v === null || v === undefined ? '' : String(v);
@@ -641,13 +686,23 @@ function exportCSV() {
     rows.push(CSV_HEADERS.map(k => escapeCSV(row[k])).join(','));
   });
   const bom = '\uFEFF';
-  const blob = new Blob([bom + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = '通所介護体験データ_' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  const csvContent = bom + rows.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const filename = '通所介護体験データ_' + new Date().toISOString().slice(0,10) + '.csv';
+
+  // iPad Safari対応: navigator.msSaveBlob / download属性非対応の場合はウィンドウで開く
+  if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+    window.navigator.msSaveOrOpenBlob(blob, filename);
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+  }
 }
 
 function importCSV(event) {
@@ -678,6 +733,8 @@ function importCSV(event) {
           disease: obj.disease || '',
           date: obj.date || '',
           referral: obj.referral || '',
+          cmOffice: obj.cmOffice || '',
+          cmName: obj.cmName || '',
           therapist: obj.therapist || '',
           purpose: obj.purpose ? obj.purpose.split('|').filter(Boolean) : [],
           gait: obj.gait || '',
@@ -720,6 +777,13 @@ function parseCSVLine(line) {
 
 loadData();
 document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+const savedAt = localStorage.getItem(STORE_KEY + '_savedAt');
+if (records.length > 0 && savedAt) {
+  const t = new Date(savedAt).toLocaleString('ja-JP');
+  showSaveStatus('✓ ' + records.length + '件を復元しました　最終保存: ' + t, false);
+} else if (records.length === 0) {
+  showSaveStatus('データなし — 入力して登録してください', false);
+}
 </script>
 </body>
 </html>
