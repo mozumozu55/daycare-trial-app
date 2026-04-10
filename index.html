@@ -116,6 +116,7 @@
   .btn-secondary { background: var(--surface2); color: var(--text); border: 0.5px solid var(--border2); }
   .btn-sample { background: var(--amber-bg); color: var(--amber); border: 0.5px solid var(--amber); }
   .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; font-weight: 500; border: 0.5px solid var(--red); background: var(--red-bg); color: var(--red); cursor: pointer; }
+  .btn-edit { padding: 6px 12px; font-size: 12px; border-radius: 8px; font-weight: 500; border: 0.5px solid var(--accent); background: var(--accent-bg); color: var(--accent); cursor: pointer; margin-right: 4px; }
   .btn-csv-export { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green); }
   .btn-csv-import { background: var(--accent-bg); color: var(--accent); border: 0.5px solid var(--accent); }
   #csv-import-input { display: none; }
@@ -232,6 +233,7 @@
     <div class="card">
       <div class="card-title">基本情報</div>
       <div class="form-grid">
+        <div class="form-group"><label>氏名</label><input type="text" id="f-name" placeholder="例: 山田 花子"></div>
         <div class="form-group"><label>年齢</label><input type="number" id="f-age" min="18" max="120" placeholder="例: 75" inputmode="numeric"></div>
         <div class="form-group"><label>性別</label><select id="f-gender"><option value="">選択してください</option><option>男性</option><option>女性</option></select></div>
         <div class="form-group"><label>要介護度</label><select id="f-care"><option value="">選択してください</option><option>要支援1</option><option>要支援2</option><option>要介護1</option><option>要介護2</option><option>要介護3</option><option>要介護4</option><option>要介護5</option></select></div>
@@ -283,11 +285,13 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="saveRecord()">登録する</button>
+      <button class="btn btn-primary" id="btn-save" onclick="saveRecord()">登録する</button>
+      <button class="btn btn-secondary" id="btn-cancel-edit" onclick="cancelEdit()" style="display:none">キャンセル</button>
       <button class="btn btn-secondary" onclick="clearForm()">クリア</button>
       <button class="btn btn-sample" onclick="loadSample()">サンプルデータ読込</button>
     </div>
     <div id="form-msg" class="msg"></div>
+    <div id="edit-banner" style="display:none;margin-top:8px;padding:8px 14px;background:var(--amber-bg);border-left:3px solid var(--amber);border-radius:0 var(--radius) var(--radius) 0;font-size:13px;color:var(--amber);">編集モード — 修正後「更新する」を押してください</div>
   </div>
 
   <!-- ===== 一覧 ===== -->
@@ -385,9 +389,12 @@ function switchTab(t) {
   if (t === 'analysis') renderAnalysis();
 }
 
+let editingId = null;
+
 function getFields() {
   return {
-    id: Date.now(),
+    id: editingId || Date.now(),
+    name: document.getElementById('f-name').value.trim(),
     age: parseInt(document.getElementById('f-age').value) || null,
     gender: document.getElementById('f-gender').value,
     care: document.getElementById('f-care').value,
@@ -419,16 +426,62 @@ function saveRecord() {
     document.getElementById('form-msg').textContent = '⚠ 必須項目を全て入力してください';
     return;
   }
-  records.push(d);
+  if (editingId) {
+    const idx = records.findIndex(r => r.id === editingId);
+    if (idx >= 0) records[idx] = d;
+    editingId = null;
+    setEditMode(false);
+    document.getElementById('form-msg').style.color = 'var(--green)';
+    document.getElementById('form-msg').textContent = '✓ 更新しました';
+  } else {
+    records.push(d);
+    document.getElementById('form-msg').style.color = 'var(--green)';
+    document.getElementById('form-msg').textContent = '✓ 登録しました（累計 ' + records.length + ' 件）';
+  }
   saveData();
-  document.getElementById('form-msg').style.color = 'var(--green)';
-  document.getElementById('form-msg').textContent = '✓ 登録しました（累計 ' + records.length + ' 件）';
   clearForm();
 }
 
+function editRecord(id) {
+  const r = records.find(rec => rec.id === id);
+  if (!r) return;
+  editingId = id;
+  // フォームに値をセット
+  const set = (elId, val) => { const el = document.getElementById(elId); if (!el) return; if (el.tagName === 'SELECT') el.value = val || ''; else el.value = val || ''; };
+  set('f-name', r.name); set('f-age', r.age); set('f-gender', r.gender);
+  set('f-care', r.care); set('f-disease', r.disease); set('f-date', r.date);
+  set('f-referral', r.referral); set('f-cm-office', r.cmOffice); set('f-cm-name', r.cmName);
+  set('f-therapist', r.therapist); set('f-gait', r.gait); set('f-stay', r.stay);
+  set('f-satisfaction', r.satisfaction); set('f-family', r.family); set('f-freaction', r.freaction);
+  set('f-transport', r.transport); set('f-follow', r.follow); set('f-followdays', r.followdays);
+  set('f-convert', r.convert); set('f-startdays', r.startdays);
+  // チェックボックス
+  const purposes = r.purpose || [];
+  document.querySelectorAll('#purpose-group .check-item').forEach(el => {
+    el.classList.toggle('checked', purposes.includes(el.textContent.trim()));
+  });
+  setEditMode(true);
+  switchTab('input');
+  window.scrollTo(0, 0);
+}
+
+function cancelEdit() {
+  editingId = null;
+  setEditMode(false);
+  clearForm();
+}
+
+function setEditMode(on) {
+  document.getElementById('btn-save').textContent = on ? '更新する' : '登録する';
+  document.getElementById('btn-cancel-edit').style.display = on ? '' : 'none';
+  document.getElementById('edit-banner').style.display = on ? '' : 'none';
+  document.getElementById('form-msg').textContent = '';
+}
+
 function clearForm() {
-  ['f-age','f-gender','f-care','f-disease','f-referral','f-therapist','f-cm-office','f-cm-name','f-gait','f-stay','f-satisfaction','f-family','f-freaction','f-transport','f-follow','f-followdays','f-convert','f-startdays'].forEach(id => {
+  ['f-name','f-age','f-gender','f-care','f-disease','f-referral','f-therapist','f-cm-office','f-cm-name','f-gait','f-stay','f-satisfaction','f-family','f-freaction','f-transport','f-follow','f-followdays','f-convert','f-startdays'].forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
   });
   document.querySelectorAll('#purpose-group .check-item').forEach(el => el.classList.remove('checked'));
@@ -490,22 +543,26 @@ function renderList() {
   const stars = s => '★'.repeat(s) + '☆'.repeat(5 - s);
   const rows = filtered.map(r => `
     <tr>
+      <td>${r.name ? `<strong>${r.name}</strong>` : '—'}</td>
       <td>${r.date}</td>
-      <td>${r.age}歳 ${r.gender}</td>
-      <td>${r.care}</td>
-      <td>${r.disease}</td>
+      <td>${r.age ? r.age + '歳' : '—'} ${r.gender || ''}</td>
+      <td>${r.care || '—'}</td>
+      <td>${r.disease || '—'}</td>
       <td>${r.referral || '—'}</td>
       <td>${r.therapist || '—'}</td>
       <td>${(r.purpose && r.purpose.length) ? r.purpose.map(p => `<span class="purpose-tag">${p}</span>`).join('') : '—'}</td>
       <td><span class="stars">${stars(r.satisfaction || 0)}</span></td>
-      <td><span class="badge ${r.convert === 'Yes' ? 'badge-yes' : 'badge-no'}">${r.convert}</span></td>
-      <td><span class="badge ${r.freaction === '良' ? 'badge-good' : r.freaction === '普' ? 'badge-normal' : 'badge-worry'}">${r.freaction}</span></td>
+      <td><span class="badge ${r.convert === 'Yes' ? 'badge-yes' : 'badge-no'}">${r.convert || '—'}</span></td>
+      <td><span class="badge ${r.freaction === '良' ? 'badge-good' : r.freaction === '普' ? 'badge-normal' : 'badge-worry'}">${r.freaction || '—'}</span></td>
       <td>${r.startdays ? r.startdays + '日' : '—'}</td>
-      <td><button class="btn-sm" onclick="deleteRecord(${r.id})">削除</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-edit" onclick="editRecord(${r.id})">編集</button>
+        <button class="btn-sm" onclick="deleteRecord(${r.id})">削除</button>
+      </td>
     </tr>`).join('');
   document.getElementById('list-table').innerHTML = `
     <table>
-      <thead><tr><th>体験日</th><th>属性</th><th>要介護度</th><th>主疾患</th><th>紹介先</th><th>セラピスト</th><th>利用目的</th><th>満足度</th><th>本利用</th><th>家族反応</th><th>開始日数</th><th></th></tr></thead>
+      <thead><tr><th>氏名</th><th>体験日</th><th>属性</th><th>要介護度</th><th>主疾患</th><th>紹介先</th><th>セラピスト</th><th>利用目的</th><th>満足度</th><th>本利用</th><th>家族反応</th><th>開始日数</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
@@ -670,8 +727,8 @@ function renderAnalysis() {
 }
 
 // ===== CSV =====
-const CSV_HEADERS = ['id','age','gender','care','disease','date','referral','cmOffice','cmName','therapist','purpose','gait','stay','satisfaction','family','freaction','transport','follow','followdays','convert','startdays'];
-const CSV_LABELS  = ['ID','年齢','性別','要介護度','主疾患','体験日','紹介先','ケアマネ事業所名','ケアマネ氏名','セラピスト名','利用目的','歩行分析','滞在時間','本人満足度','家族同席','家族反応','送迎問題','フォロー有無','フォロー日数','本利用','利用開始日数'];
+const CSV_HEADERS = ['id','name','age','gender','care','disease','date','referral','cmOffice','cmName','therapist','purpose','gait','stay','satisfaction','family','freaction','transport','follow','followdays','convert','startdays'];
+const CSV_LABELS  = ['ID','氏名','年齢','性別','要介護度','主疾患','体験日','紹介先','ケアマネ事業所名','ケアマネ氏名','セラピスト名','利用目的','歩行分析','滞在時間','本人満足度','家族同席','家族反応','送迎問題','フォロー有無','フォロー日数','本利用','利用開始日数'];
 
 function escapeCSV(v) {
   const s = v === null || v === undefined ? '' : String(v);
@@ -727,6 +784,7 @@ function importCSV(event) {
         keys.forEach((k, idx) => { obj[k] = vals[idx] !== undefined ? vals[idx] : ''; });
         const rec = {
           id: parseInt(obj.id) || Date.now() + i,
+          name: obj.name || '',
           age: parseInt(obj.age) || null,
           gender: obj.gender || '',
           care: obj.care || '',
